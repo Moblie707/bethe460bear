@@ -67,6 +67,36 @@ else
 				printf "%-15s   %-20s   %12s   %-7s %s\n" "$user" "$name" "$phone" "${tty[2]}" "${what[2]}"
 			fi
 		done
+	# This means search only for specific users
+	else
+		# Loop over users specified
+		for user in $*
+		do
+			# Get name and phone number
+			name=`grep $user /etc/passwd | cut -d":" -f5 | cut -d"," -f1`
+			phone=`grep $user /etc/passwd | cut -d":" -f5 | cut -d"," -f3`
+
+			# Check if they are logged on
+			IFS=$'\n' online=(`w $user`)
+
+			if (test ${#online[@]} == 2) then
+				# User is offline
+				tty="NOT ON"
+				what="-"
+
+				# Print user info
+				printf "%-15s   %-20s   %12s   %-7s %s\n" "$user" "$name" "$phone" "$tty" "$what"
+			else
+				# User is online, so grab info
+				IFS=$'\n' tty=(`w $user | tr -s " " | cut -d" " -f2`)
+				IFS=$'\n' what=(`w $user | tr -s " " | cut -d" " -f8-`)
+
+				# Print user info
+				printf "%-15s   %-20s   %12s   %-7s %s\n" "$user" "$name" "$phone" "${tty[2]}" "${what[2]}"
+			fi
+		done
+		
+
 	fi
 
 fi
