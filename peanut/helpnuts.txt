@@ -1,0 +1,31 @@
+The following are valid commands: 
+-------------------------------------------------------
+showcase filename
+      Displays the named file on the screen one page at
+      a time, with the capability to scroll up or down 
+      with the arrow keys.
+
+nutcall userid
+      Looks up the phone number of given user id and   
+      prints user's full name and office phone number. 
+
+nutlist
+      Displays the full names of those currently       
+      logged in.                                       
+
+nutstuff
+      Display contents of current directory.
+
+nutty
+      A mystery! You should try it for yourself!
+
+peanutbutter filename
+      Opens the given file in vim.
+
+spybear ??arg??
+      Runs the spybear program. See that program for
+      valid commands.
+
+nutsout
+      Exits the peanut shell.
+

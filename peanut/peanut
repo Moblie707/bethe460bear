@@ -1,0 +1,136 @@
+#!/bin/bash
+
+# Will Baglivio
+# 1/23/22
+# CSC 460
+# Peanut is a basic shell with a limited number
+# of possible commands that the user can call. Use
+# "helpnuts" to list possible commands, "bignut" to open
+# up another shell within peanut, and "nutsout" to
+# leave the peanut shell.
+
+# Run peanut shell while command isn't "nutsout"
+while true
+do
+	# Prompt user for command
+	read -p "Peanut> " cmd
+
+	# Convert to list to possibly get arguments
+	cmds=($cmd)
+
+	# Perform behavior based on command
+	case ${cmds[0]} in
+	"showcase")
+		echo "WIP"
+		;;
+
+	# Looks up phone number of user id and prints user's
+	# full name and office phone number on the screen
+	"nutcall")
+		# Only run command if proper number of arguments passed
+		if (test ${#cmds[@]} == 2) then
+			# Userid
+			user=${cmds[1]}
+
+			# Run if userid exists
+			exists=($`finger $user`)
+
+			if (test ${#exists[@]} != 1) then
+				# Get name and phone number
+				name=`grep $user /etc/passwd | cut -d":" -f5 | cut -d"," -f1`
+        	        	phone=`grep $user /etc/passwd | cut -d":" -f5 | cut -d"," -f3`
+		
+				# Print name and phone
+				printf "%-20s  %12s\n" "$name" "$phone"
+			else
+				# User does not exist
+				echo "$user does not exist."
+			fi
+		else
+			echo "Must pass userid as second argument. No more than one userid please."
+		fi
+		;;
+
+	# Display full names of those currently logged in
+	"nutlist")
+		# Get list of currently logged on users
+		log_users=(`who | cut -d" " -f1`)
+
+		# Remove root
+		log_users=("${log_users[@]:1}")
+
+		# Loop over users
+		for user in ${log_users[@]}
+		do
+			# Get name
+			name=`grep $user /etc/passwd | cut -d":" -f5 | cut -d"," -f1`
+			
+			# Print name
+			echo "$name"
+		done
+		;;
+
+	# Display contents of current directory
+	"nutstuff")
+		echo `ls`
+		;;
+
+	# Display commands available under the peanut shell
+	"helpnuts")
+		cat helpnuts.txt
+		;;
+
+	# Escapes to a real bash shell
+	"bignut")
+		bash
+		;;
+
+	# Does something special
+	"nutty")
+		echo "WIP"
+		;;
+
+	# Opens the given file in vim
+	"peanutbutter")
+		# Only run command if proper number of arguments passed
+		if (test ${#cmds[@]} == 2) then
+			# Filename
+			filename = ${cmds[1]}
+
+			# Open file in vim
+			vi $filename
+		else
+			echo "Must pass filename as second argument. No more than one file please."
+		fi
+		;;
+
+	# Exit peanut shell
+	"nutsout")
+		break
+		;;
+
+	# Invalid command
+	*)
+		echo "Not valid dummy. Try helpnuts."
+		;;
+	esac
+done
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
