@@ -1,0 +1,102 @@
+#!/bin/bash
+
+# Will Baglivio
+# 1/21/22
+# CSC 460
+# Spybear allows the user to see who is logged on assemble,
+# and more specifically those in the CSC460 class.
+
+# Headers
+echo "  USERID               NAME                  PHONE       TTY       WHAT"
+
+# Check which command user wants to run
+
+# Generic spybear command
+if (test $# -eq 0) then
+	# Get list of currently logged on users
+	log_users=(`who | cut -d" " -f1`)
+	
+	# Remove root
+	log_users=("${log_users[@]:1}")
+
+	# Loop over users to get info
+	for user in ${log_users[@]}
+	do
+		# Get name and phone number
+		name=`grep $user /etc/passwd | cut -d":" -f5 | cut -d"," -f1`
+		phone=`grep $user /etc/passwd | cut -d":" -f5 | cut -d"," -f3`
+
+		# Get tty and what
+		IFS=$'\n' tty=(`w $user | tr -s " " | cut -d" " -f2`)
+		IFS=$'\n' what=(`w $user | tr -s " " | cut -d" " -f8-`)
+
+		# Print user info
+		printf "%-15s   %-20s   %12s   %-7s %s\n" "$user" "$name" "$phone" "${tty[2]}" "${what[2]}"
+	done
+
+# Otherwise we have two options
+else
+	# Get all users in our class
+	if (test $1 == "all") then
+		# Get list of all users in class
+		all_users=(`grep BETHE460BEAR /etc/passwd | cut -d":" -f1`)
+
+		# Loop over users to get info
+		for user in ${all_users[@]}
+		do
+			# Get name and phone number
+			name=`grep $user /etc/passwd | cut -d":" -f5 | cut -d"," -f1`
+			phone=`grep $user /etc/passwd | cut -d":" -f5 | cut -d"," -f3`
+
+			# Check if they are logged on
+			IFS=$'\n' online=(`w $user`)
+
+			if (test ${#online[@]} == 2) then
+				# User is offline
+				tty="NOT ON"
+				what="-"
+
+				# Print user info
+				printf "%-15s   %-20s   %12s   %-7s %s\n" "$user" "$name" "$phone" "$tty" "$what"
+			else
+				# User is online, so grab info
+				IFS=$'\n' tty=(`w $user | tr -s " " | cut -d" " -f2`)
+				IFS=$'\n' what=(`w $user | tr -s " " | cut -d" " -f8-`)
+
+				# Print user info
+				printf "%-15s   %-20s   %12s   %-7s %s\n" "$user" "$name" "$phone" "${tty[2]}" "${what[2]}"
+			fi
+		done
+	# This means search only for specific users
+	else
+		# Loop over users specified
+		for user in $*
+		do
+			# Get name and phone number
+			name=`grep $user /etc/passwd | cut -d":" -f5 | cut -d"," -f1`
+			phone=`grep $user /etc/passwd | cut -d":" -f5 | cut -d"," -f3`
+
+			# Check if they are logged on
+			IFS=$'\n' online=(`w $user`)
+
+			if (test ${#online[@]} == 2) then
+				# User is offline
+				tty="NOT ON"
+				what="-"
+
+				# Print user info
+				printf "%-15s   %-20s   %12s   %-7s %s\n" "$user" "$name" "$phone" "$tty" "$what"
+			else
+				# User is online, so grab info
+				IFS=$'\n' tty=(`w $user | tr -s " " | cut -d" " -f2`)
+				IFS=$'\n' what=(`w $user | tr -s " " | cut -d" " -f8-`)
+
+				# Print user info
+				printf "%-15s   %-20s   %12s   %-7s %s\n" "$user" "$name" "$phone" "${tty[2]}" "${what[2]}"
+			fi
+		done
+		
+
+	fi
+
+fi
