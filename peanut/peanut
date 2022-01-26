@@ -9,6 +9,17 @@
 # up another shell within peanut, and "nutsout" to
 # leave the peanut shell.
 
+# Secret values
+curr=6
+s1=`tput setaf 1`
+s2=`tput setaf 2`
+s3=`tput setaf 3`
+s4=`tput setaf 4`
+s5=`tput setaf 5`
+s6=`tput setaf 6`
+s7=`tput sgr0`		
+stuff=($s1 $s2 $s3 $s4 $s5 $s6 $s7)
+
 # Run peanut shell while command isn't "nutsout"
 while true
 do
@@ -92,12 +103,20 @@ do
 
 	# Escapes to a real bash shell
 	"bignut")
+		echo -n "${s7}"
 		bash
+		echo -n "${stuff[$curr]}"
 		;;
 
 	# Does something special
 	"nutty")
+		if (test $curr -lt 6) then
+			curr=$((curr + 1))
+		else
+			curr=0
+		fi		
 		
+		echo "${stuff[$curr]}Let's get nutty!"
 		;;
 
 	# Opens the given file in vim
@@ -122,6 +141,7 @@ do
 
 	# Exit peanut shell
 	"nutsout")
+		echo -n "${s7}"
 		break
 		;;
 
