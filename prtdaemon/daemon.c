@@ -51,7 +51,7 @@ int main(int argc, char *argv[])
 			{
 				// Daemon not yet initialized, so proceed.
 				// Ask OS for semaphores
-				int sem_id = semget(IPC_PRIVATE, 3, 077);
+				int sem_id = semget(IPC_PRIVATE, 3, 0770);
 	
 				// See if request was successful
 				if (sem_id == -1)
@@ -130,8 +130,34 @@ int main(int argc, char *argv[])
 					if (shmems[0] == 1)
 						break;
 
-					// Queue stuff
+					// Get queue request and print
+					struct queueVals request;
+					request = shmemq[shmemq[SIZE].pos];
+					printf("User %d prints: ", request.pid);
+
+					char filename[25];
+					strcpy(filename, request.filename);
+
+					if ((fp = fopen(filename, "r")) == NULL)
+					{
+						printf(":( could not open requested file to read.\n");
+						return -1;
+					}
+
+					// Read contents of file
+					// Derived from https://www.geeksforgeeks.org/c-program-print-contents-file/
+					char c;
+					c = fgetc(fp);
+					while (c != EOF)
+					{
+						printf("%c", c);
+						c = fgetc(fp);
+					}
 					
+					fclose(fp);
+
+					// Move front of queue
+					shmemq[SIZE].pos = (shmemq[SIZE].pos + 1) % SIZE;
 
 					v(MUTEX, sem_id);
 					v(EMPTY, sem_id);

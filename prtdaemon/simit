@@ -1,0 +1,12 @@
+#!/bin/bash
+cc daemon.c -o daemon
+cc user.c -o user
+cc stop.c -o stop
+daemon 5 &
+sleep 1
+user &
+user &
+user &
+sleep 10
+user &
+user &
