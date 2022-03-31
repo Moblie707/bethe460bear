@@ -19,18 +19,16 @@ void busy_code();
 
 int main(int argc, char * argv[])
 {
+	printf("Can we get here even????");
 	// 5 philosophers
 	int N = 1;	
 
 	// Semaphore stuff
 	int HowManySems = N;
-	int firstid;
-	HowManySems = N;
-
 	int i, sem_id;
-
+	printf("Journey starts here.");
 	//  Ask OS for semaphores.
-	sem_id = semget (IPC_PRIVATE, HowManySems, 0777);
+	sem_id = semget (IPC_PRIVATE, HowManySems, 0770);
 
 	//  See if you got the request.
 	if (sem_id == -1)
@@ -38,11 +36,11 @@ int main(int argc, char * argv[])
     		printf("%s","SemGet Failed.\n");
     		return (-1);
    	}
-
+	printf("First step!");
 	// Current semaphore
 	int CURR = 0;
 
-	// Create Child process, give unique myID, and initialize semaphores
+	// Create Child process, give unique ID, and initialize semaphores
 	semctl(sem_id, CURR, SETVAL, 1);
 	
 	for (i = 1; i < N; i++)
@@ -56,15 +54,18 @@ int main(int argc, char * argv[])
 
 	// Set random seed
 	srand(getpid());
-
+	printf("Almost there!");
 	// Infinite loop
-	while (1)
-	{	
+	while (N == N)
+	{
+		printf("I got here!");	
 		// Three things all philosophers do
 		think(CURR);
 		hungry(CURR, N, sem_id);
 		eat(CURR, N, sem_id);
 	}
+
+	return(0);
 }
 
 void think(int curr)
@@ -126,7 +127,7 @@ void busy_code()
 	int j,k,m,x;
 
 	int var = (rand()%5)+1;
-
+	printf("I'm here somehow...");
 	for (j = 0; j < 1000*var; j++)
 	{
 		for (k = 0; k < 100*var; k++)
