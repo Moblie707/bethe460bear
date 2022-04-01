@@ -19,14 +19,13 @@ void busy_code();
 
 int main(int argc, char * argv[])
 {
-	printf("Can we get here even????");
 	// 5 philosophers
-	int N = 1;	
+	int N = 5;	
 
 	// Semaphore stuff
 	int HowManySems = N;
 	int i, sem_id;
-	printf("Journey starts here.");
+	
 	//  Ask OS for semaphores.
 	sem_id = semget (IPC_PRIVATE, HowManySems, 0770);
 
@@ -36,7 +35,7 @@ int main(int argc, char * argv[])
     		printf("%s","SemGet Failed.\n");
     		return (-1);
    	}
-	printf("First step!");
+	
 	// Current semaphore
 	int CURR = 0;
 
@@ -54,11 +53,10 @@ int main(int argc, char * argv[])
 
 	// Set random seed
 	srand(getpid());
-	printf("Almost there!");
+	
 	// Infinite loop
 	while (N == N)
 	{
-		printf("I got here!");	
 		// Three things all philosophers do
 		think(CURR);
 		hungry(CURR, N, sem_id);
@@ -78,7 +76,7 @@ void think(int curr)
 		printf("\t");
 	}
 
-	printf("%d THINKING", curr);
+	printf("%d THINKING\n", curr);
 
 	busy_code();	
 }
@@ -95,7 +93,7 @@ void hungry(int curr, int N, int sem_id)
 		printf("\t");
 	}
 
-	printf("%d HUNGRY", curr);
+	printf("%d HUNGRY\n", curr);
 
 	p((curr)%N, sem_id);
 	busy_code();
@@ -114,7 +112,7 @@ void eat(int curr, int N, int sem_id)
 		printf("\t");
 	}
 
-	printf("%d EATING", curr);
+	printf("%d EATING\n", curr);
 
 	busy_code();
 	v((curr)%N, sem_id);
@@ -126,9 +124,9 @@ void busy_code()
 	// Eats up a variable number of CPU cycles
 	int j,k,m,x;
 
-	int var = (rand()%5)+1;
-	printf("I'm here somehow...");
-	for (j = 0; j < 1000*var; j++)
+	int var = (rand()%3)+1;
+	
+	for (j = 0; j < 300*var; j++)
 	{
 		for (k = 0; k < 100*var; k++)
 		{
