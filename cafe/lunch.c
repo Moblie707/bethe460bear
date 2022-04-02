@@ -129,7 +129,7 @@ int main(int argc, char * argv[])
 		int CURR = 0;
 
 		// Create Child process, give unique ID, and initialize semaphores
-		semctl(sem_id, CURR, SETVAL, 1);
+		semctl(sem_id, CURR, SETVAL, 0);
 	
 		for (i = 1; i < N; i++)
 		{
@@ -137,7 +137,7 @@ int main(int argc, char * argv[])
 				break;
 
 			CURR++;
-			semctl(sem_id, CURR, SETVAL, 1);
+			semctl(sem_id, CURR, SETVAL, 0);
 		}
 
 		// Set random seed
