@@ -11,4 +11,19 @@ struct process
 	int pos;
 };
 
+// Information for a process node
+struct node
+{
+	struct process p;
+	struct node *next;
+};
+
+// Queue information
+struct queue
+{
+	int size;
+	struct node *front;
+	struct node *rear;
+};
+
 #endif

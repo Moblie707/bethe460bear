@@ -14,6 +14,7 @@
  * cleans up shared resources.
  */
 
+#include <stdlib.h>
 #include <sys/types.h>
 #include <sys/ipc.h>
 #include <sys/shm.h>
@@ -28,8 +29,10 @@
 #define MUTEX 0
 #define FULL 1
 #define EMPTY 2
+#define QUEUE 3
 
 #include "structs.h"
+#include "prototypes.h"
 
 int fileExists(const char *filename);
 
@@ -51,7 +54,7 @@ int main(int argc, char *argv[])
 			{
 				// Consumer not yet initialized, so proceed.
 				// Ask OS for semaphores
-				int sem_id = semget(IPC_PRIVATE, 3, 0770);
+				int sem_id = semget(IPC_PRIVATE, 4, 0770);
 	
 				// See if request was successful
 				if (sem_id == -1)
@@ -83,6 +86,20 @@ int main(int argc, char *argv[])
 				shmemb[buffSize].pos = 0;
 				shmemb[buffSize+1].pos = 0;
 			
+				// Get queue shared memory
+				int shmidq = shmget(IPC_PRIVATE, sizeof(struct queue), 0770);
+
+				if (shmidq == -1)
+				{
+					printf("Could not get shared memory.\n");
+					return -1;
+				}
+
+				// Attach to shared memory
+				struct queue *shmemq;
+		
+				shmemq = (struct queue *) shmat(shmidq, NULL, SHM_RND);
+
 				// Get stop shared memory
 				int shmids = shmget(IPC_PRIVATE, sizeof(int), 0770);
 
@@ -101,6 +118,7 @@ int main(int argc, char *argv[])
 				shmems[0] = 0;
 
 				// Write all shared resource ids to external file
+				// Exception: queue only used within consumer, so no need
 				FILE *fopen(), *fp;
 
 				if ((fp = fopen(MYIDS, "w")) == NULL)
@@ -117,67 +135,71 @@ int main(int argc, char *argv[])
 				fclose(fp);
 
 				/* Actual Memory Management code */
-				
-				// Run while we don't need to stop
-				while (shmems[0] == 0)
+
+				// Parent process will handle receiving requests from the buffer
+				// and adding them to the shared consumer queue.
+				if (fork())
 				{
-					p(FULL, sem_id);
-					// Check if stopped after potential unblock
-					if (shmems[0] == 1)
-						break;
-					p(MUTEX, sem_id);
-					// Check if stopped after potential unblock
-					if (shmems[0] == 1)
-						break;
-
-					// Get buffer request and print
-					struct process request;
-					request = shmemb[shmemb[buffSize].pos];
-					printf("User %d prints: ", request.pid);
-					/*
-					char filename[25];
-					strcpy(filename, request.filename);
-
-					if ((fp = fopen(filename, "r")) == NULL)
+					// Run while we don't need to stop
+					while (shmems[0] == 0)
 					{
-						printf(":( could not open requested file to read.\n");
-						return -1;
+						// Try to access buffer
+						p(FULL, sem_id);
+						// Check if stopped after potential unblock
+						if (shmems[0] == 1)
+							break;
+						p(MUTEX, sem_id);
+						// Check if stopped after potential unblock
+						if (shmems[0] == 1)
+							break;
+
+						// Get buffer request
+						struct process request;
+						request = shmemb[shmemb[buffSize].pos];
+
+						// Move front of buffer
+						shmemb[buffSize].pos = (shmemb[buffSize].pos + 1) % buffSize;
+
+						v(MUTEX, sem_id);
+						v(EMPTY, sem_id);
+
+						
+						//Place requested job in the queue.
+						p(QUEUE, sem_id);
+
+						// Allocate memory for process node
+						struct node *myprocess = (struct node*) malloc(sizeof(struct node));
+
+						// Put into queue
+						enqueue(shmemq[0], myprocess);
+				
+						v(QUEUE, sem_id);
 					}
 
-					// Read contents of file
-					// Derived from https://www.geeksforgeeks.org/c-program-print-contents-file/
-					char c;
-					c = fgetc(fp);
-					while (c != EOF)
-					{
-						printf("%c", c);
-						c = fgetc(fp);
-					}
-					
-					fclose(fp);*/
+					/* Shared resources cleanup */
+					// Give time for other processes to stop using shared resources
+					sleep(1);
 
-					// Move front of buffer
-					shmemb[buffSize].pos = (shmemb[buffSize].pos + 1) % buffSize;
+					if (shmdt(shmemb) == -1) printf("shmgm: ERROR in detaching.\n");
+					if (shmdt(shmems) == -1) printf("shmgm: ERROR in detaching.\n");
+					if (shmdt(shmemq) == -1) printf("shmgm: ERROR in detaching.\n");
 
-					v(MUTEX, sem_id);
-					v(EMPTY, sem_id);
+					if ((shmctl(shmidb, IPC_RMID, NULL)) == -1) printf("ERROR in removing shmem.\n");
+					if ((shmctl(shmids, IPC_RMID, NULL)) == -1) printf("ERROR in removing shmem.\n");
+					if ((shmctl(shmidq, IPC_RMID, NULL)) == -1) printf("ERROR in removing shmem.\n");
+					if ((semctl(sem_id, 0, IPC_RMID, 0)) == -1) printf("ERROR in removing sem.\n");
+
+					int ret;
+					if ((ret = remove(MYIDS)) == -1) printf("ERROR: unable to delete mmids.\n");
+
+					printf("Consumer stopped.");
 				}
+				// Child process handles putting processes in RAM and printing jobs/RAM
+				else
+				{
 
-				/* Shared resources cleanup */
-				// Give time for other processes to stop using shared resources
-				sleep(1);
 
-				if (shmdt(shmemb) == -1) printf("shmgm: ERROR in detaching.\n");
-				if (shmdt(shmems) == -1) printf("shmgm: ERROR in detaching.\n");
-
-				if ((shmctl(shmidb, IPC_RMID, NULL)) == -1) printf("ERROR in removing shmem.\n");
-				if ((shmctl(shmids, IPC_RMID, NULL)) == -1) printf("ERROR in removing shmem.\n");
-				if ((semctl(sem_id, 0, IPC_RMID, 0)) == -1) printf("ERROR in removing sem.\n");
-
-				int ret;
-				if ((ret = remove(MYIDS)) == -1) printf("ERROR: unable to delete mmids.\n");
-
-				printf("Consumer stopped.");				
+				}
 			}
 			else
 			{	
