@@ -140,6 +140,9 @@ int main(int argc, char *argv[])
 				// and adding them to the shared consumer queue.
 				if (fork())
 				{
+					// Current RAM ID
+					char crid = 'A';
+
 					// Run while we don't need to stop
 					while (shmems[0] == 0)
 					{
@@ -170,8 +173,21 @@ int main(int argc, char *argv[])
 						// Allocate memory for process node
 						struct node *myprocess = (struct node*) malloc(sizeof(struct node));
 
+						// Assign RAM ID
+						(myprocess->p).rid = crid;
+		
+						// Increment RAM ID
+						if (crid != 'Z')
+						{
+							crid++;
+						}
+						else
+						{
+							crid = 'A';
+						}
+
 						// Put into queue
-						enqueue(shmemq[0], myprocess);
+						enqueue(shmemq, myprocess);
 				
 						v(QUEUE, sem_id);
 					}
@@ -197,8 +213,85 @@ int main(int argc, char *argv[])
 				// Child process handles putting processes in RAM and printing jobs/RAM
 				else
 				{
+					// Create RAM
+					char RAM[rows*cols];
+					int i, j;
+
+					for (i = 0; i < rows*cols; i++)
+					{
+						RAM[i] = '.';
+					} 
+
+					// Run while we don't need to shutdown
+					while (shmems[0] == 0)
+					{
+						// Gain access to queue
+						p(QUEUE, sem_id);
+
+						// Print header
+						printf("ID thePID Size Sec\n");
+
+						// Loop through queue to update each job
+						int qsize = shmemq->size;
+
+						for (i = 0; i < qsize; i++)
+						{
+							// Get job
+							struct node *myjob = dequeue(shmemq);
+
+							// Perform different action depending on if
+							// it is in RAM
+							if ((myjob->p).inRAM)
+							{
+								// Decrement time remaining
+								(myjob->p).time = (myjob->p).time - 1;
+
+								// See if job is done
+								if ((myjob->p).time == 0)
+								{
+									// Remove from RAM
+
+									// Wake up producer
+									v(0, (myjob->p).psemid);
+								}
+								else
+								{
+									// Print job
+									struct process jp = myjob->p;
+									printf("%c. %-6d %-4d %-3d", jp.rid, jp.pid, jp.size, jp.time);
+
+									// Requeue
+									enqueue(shmemq, myjob);
+								}
+							}
+							else
+							{
+								// Try to put job in RAM
 
 
+								
+								// Print job
+								struct process jp = myjob->p;
+								printf("%c. %-6d %-4d %-3d", jp.rid, jp.pid, jp.size, jp.time);
+
+								// Requeue
+								enqueue(shmemq, myjob);
+							}
+
+						}
+
+						v(QUEUE, sem_id);
+
+						// Print RAM
+						printf("Bob’s   Memory   Manager");
+						printf("------------------------");
+
+						
+						for (i = 0; i < rows; i++)
+						{
+
+						}
+					}
 				}
 			}
 			else

@@ -6,8 +6,11 @@ struct process
 {
 	int pid;
 	int psemid;
+	char rid;
 	int size;
 	int time;
+	int inRAM;
+	int RAMPos;
 	int pos;
 };
 
