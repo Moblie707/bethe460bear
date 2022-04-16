@@ -17,7 +17,7 @@ struct process
 // Information for a process node
 struct node
 {
-	struct process p;
+	struct process *p;
 	struct node *next;
 };
 

@@ -34,7 +34,8 @@
 #include "structs.h"
 #include "prototypes.h"
 
-int fileExists(const char *filename);
+void putInRAM(/* in */ int size, /* inout */ char *RAM, /* inout */ struct process *myjob);
+void removeFromRAM(/* in */ int size, /* inout */ char *RAM, /* inout */ struct process *myjob);
 
 int main(int argc, char *argv[])
 {	
@@ -174,7 +175,7 @@ int main(int argc, char *argv[])
 						struct node *myprocess = (struct node*) malloc(sizeof(struct node));
 
 						// Assign RAM ID
-						(myprocess->p).rid = crid;
+						myprocess->p->rid = crid;
 		
 						// Increment RAM ID
 						if (crid != 'Z')
@@ -214,10 +215,11 @@ int main(int argc, char *argv[])
 				else
 				{
 					// Create RAM
-					char RAM[rows*cols];
+					int sizeRAM = rows*cols;
+					char RAM[sizeRAM];
 					int i, j;
 
-					for (i = 0; i < rows*cols; i++)
+					for (i = 0; i < sizeRAM; i++)
 					{
 						RAM[i] = '.';
 					} 
@@ -241,24 +243,25 @@ int main(int argc, char *argv[])
 
 							// Perform different action depending on if
 							// it is in RAM
-							if ((myjob->p).inRAM)
+							if (myjob->p->inRAM)
 							{
 								// Decrement time remaining
-								(myjob->p).time = (myjob->p).time - 1;
+								myjob->p->time = myjob->p->time - 1;
 
 								// See if job is done
-								if ((myjob->p).time == 0)
+								if (myjob->p->time == 0)
 								{
 									// Remove from RAM
+									removeFromRAM(sizeRAM, RAM, myjob->p);
 
 									// Wake up producer
-									v(0, (myjob->p).psemid);
+									v(0, myjob->p->psemid);
 								}
 								else
 								{
 									// Print job
-									struct process jp = myjob->p;
-									printf("%c. %-6d %-4d %-3d", jp.rid, jp.pid, jp.size, jp.time);
+									struct process *jp = myjob->p;
+									printf("%c. %-6d %-4d %-3d", jp->rid, jp->pid, jp->size, jp->time);
 
 									// Requeue
 									enqueue(shmemq, myjob);
@@ -267,12 +270,11 @@ int main(int argc, char *argv[])
 							else
 							{
 								// Try to put job in RAM
-
-
+								putInRAM(sizeRAM, RAM, myjob->p);
 								
 								// Print job
-								struct process jp = myjob->p;
-								printf("%c. %-6d %-4d %-3d", jp.rid, jp.pid, jp.size, jp.time);
+								struct process *jp = myjob->p;
+								printf("%c. %-6d %-4d %-3d", jp->rid, jp->pid, jp->size, jp->time);
 
 								// Requeue
 								enqueue(shmemq, myjob);
@@ -286,11 +288,31 @@ int main(int argc, char *argv[])
 						printf("Bob’s   Memory   Manager");
 						printf("------------------------");
 
-						
+						// Header
+						printf("*");
+						for (i = 0; i < cols; i++)
+							printf("*");
+						printf("*\n");
+
+						// Body
 						for (i = 0; i < rows; i++)
 						{
-
+							printf("*");
+							for (j = 0; j < cols; j++)
+							{
+								printf("%c",RAM[(i*rows) + j]);
+							}
+							printf("*\n");
 						}
+
+						// Footer
+						printf("*");
+						for (i = 0; i < cols; i++)
+							printf("*");
+						printf("*\n");
+
+						// Sleep for 1 second
+						sleep(1);
 					}
 				}
 			}
@@ -308,42 +330,91 @@ int main(int argc, char *argv[])
 	{
 		printf("Must input number of rows (1-20), number of columns (1-50), and buffer size (1-26).\n");
 	}
+
+	return 0;
 }
 
-int fileExists(const char* filename)
+void putInRAM(/* in */ int size, /* inout */ char *RAM, /* inout */ struct process *myjob)
 {
-	// This function checks if a file exists given
-	// the name of the file.
-	// 
-	// Pulled from: https://www.delftstack.com/howto/c/c-check-if-file-exists/
-	
-	struct stat buffer;
-	int exist = stat(filename, &buffer);
-	
-	if (exist == 0)
-		return 1;
-	else
-		return 0;
+	/* Pre: This function takes an array of characters representing RAM,
+ 	 * and a process that is to be put into RAM. 
+ 	 * Post: RAM is iterated over position by position trying to assign
+ 	 * a contiguous block of memory. If it succeeds, the job is written
+ 	 * into RAM and marked as such. Otherwise, nothing happens.
+ 	 */ 
+
+	// Marks where the job's space in memory starts
+	int jobPos = 0;
+
+	// How much memory we have been able to acquire
+	int totalSpace = 0;
+
+	int i,j;
+
+	for (i = 0; i < size; i++)
+	{
+		// If block is occupied, reset job position and space acquired.
+		if (RAM[i] != '.')
+		{
+			jobPos = i+1;
+			totalSpace = 0;
+		}
+		else
+		{
+			// One block of memory acquired.
+			totalSpace++;
+			
+			// Check to see if we got all the memory we needed
+			if (totalSpace == myjob->size)
+			{
+				// Go back and fill in RAM
+				for (j = jobPos; j < (jobPos + myjob->size); j++)
+				{
+					RAM[j] = myjob->rid;
+				}
+
+				// Set info now that it is in RAM
+				myjob->inRAM = 1;
+				myjob->RAMPos = jobPos;
+			}
+		}
+	}
 }
 
-p(int s,int sem_id)
+void removeFromRAM(/* in */ int size, /* inout */ char *RAM, /* inout */ struct process *myjob)
 {
-	struct sembuf sops;
+	/* Pre: This function takes an array of characters representing RAM,
+ 	 * and a process that is to be removed from RAM.
+ 	 * Post: The job previously is RAM is removed by replacing its ID
+ 	 * with periods to show the space is now free.
+ 	 */ 
 
-	sops.sem_num = s;
-	sops.sem_op = -1;
-	sops.sem_flg = 0;
-	if((semop(sem_id, &sops, 1)) == -1) printf("%s", "'P' error\n");
+	int i;
+
+	for (i=myjob->RAMPos; i < (myjob->RAMPos + myjob->size); i++)
+	{
+		RAM[i] = '.';
+	}
+
+	myjob->inRAM = 0;
 }
 
-v(int s, int sem_id)
-{
-	struct sembuf sops;
 
-	sops.sem_num = s;
-	sops.sem_op = 1;
-	sops.sem_flg = 0;
-	if((semop(sem_id, &sops, 1)) == -1) printf("%s","'V' error\n");
-}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
