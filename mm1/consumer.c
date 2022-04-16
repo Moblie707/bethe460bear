@@ -23,16 +23,9 @@
 #include <sys/stat.h>
 #include <string.h>
 
-#define MYIDS "mmids"
-
-// Indices of arrays of semaphores
-#define MUTEX 0
-#define FULL 1
-#define EMPTY 2
-#define QUEUE 3
-
 #include "structs.h"
 #include "prototypes.h"
+#include "constants.h"
 
 void putInRAM(/* in */ int size, /* inout */ char *RAM, /* inout */ struct process *myjob);
 void removeFromRAM(/* in */ int size, /* inout */ char *RAM, /* inout */ struct process *myjob);
