@@ -1,11 +1,11 @@
 /*
  * Will Baglivio
  * CSC 460
- * 3/24/22
- * Beastie Print Daemon
+ * 4/16/22
+ * Memory Management Project One
  * 
- * This program tells the daemon to clean up
- * its shared resources and shutdown.
+ * This program tells the consumer and producers 
+ * to clean up their shared resources and shutdown.
  */
 
 #include <sys/types.h>
@@ -16,14 +16,9 @@
 #include <sys/stat.h>
 #include <string.h>
 
-#define MYIDS "beastieids"
-
-// Indices of arrays of semaphores
-#define MUTEX 0
-#define FULL 1
-#define EMPTY 2
-
-int fileExists(const char *filename);
+#include "structs.h"
+#include "prototypes.h"
+#include "constants.h"
 
 int main(int argc, char *argv[])
 {
@@ -36,7 +31,7 @@ int main(int argc, char *argv[])
 
 		if ((fp = fopen(MYIDS, "r")) == NULL)
 		{
-			printf(":( could not open beastieids to read.\n");
+			printf(":( could not open mmids to read.\n");
 			return -1;
 		}
 
@@ -60,42 +55,6 @@ int main(int argc, char *argv[])
 	}
 	else
 	{
-		printf("No daemon to stop.\n");
+		printf("No consumer to stop.\n");
 	}	
-}
-
-int fileExists(const char* filename)
-{
-	// This function checks if a file exists given
-	// the name of the file.
-	//
-	// Pulled from: https://www.delftstack.com/howto/c/c-check-if-file-exists/
-	
-	struct stat buffer;
-	int exist = stat(filename, &buffer);
-	
-	if (exist == 0)
-		return 1;
-	else
-	 	return 0;
-}
-
-p(int s,int sem_id)
-{
-	struct sembuf sops;
-
-	sops.sem_num = s;
-	sops.sem_op = -1;
-	sops.sem_flg = 0;
-	if((semop(sem_id, &sops, 1)) == -1) printf("%s", "'P' error\n");
-}
-
-v(int s, int sem_id)
-{
-	struct sembuf sops;
-
-	sops.sem_num = s;
-	sops.sem_op = 1;
-	sops.sem_flg = 0;
-	if((semop(sem_id, &sops, 1)) == -1) printf("%s","'V' error\n");
 }
