@@ -91,19 +91,31 @@ int main(int argc, char *argv[])
 		printf("%d is requesting %d blocks for %d seconds.\n", myid, jsize, jtime);
 
 		// Put job in buffer
+		// Only proceed if not shutdown
 		p(EMPTY, sem_id);
-		p(MUTEX, sem_id);
+		if (shmems[0] == 0)
+		{
+			p(MUTEX, sem_id);
+			if (shmems[0] == 0)
+			{
+				shmemb[shmemb[SIZE+1].pos] = myjob;
+				shmemb[SIZE+1].pos = (shmemb[SIZE+1].pos + 1) % SIZE;
+			}
+			v(MUTEX, sem_id);
+			v(FULL, sem_id);
+		}
+		else
+		{
+			v(EMPTY, sem_id);
+		}
 
-		shmemb[shmemb[SIZE+1].pos] = myjob;
-		shmemb[SIZE+1].pos = (shmemb[SIZE+1].pos + 1) % SIZE;
-
-		v(MUTEX, sem_id);
-		v(FULL, sem_id);
-
-		// Wait for job to finish
-		p(0, psem_id);
-
-		printf("%d finished my request of %d blocks for %d seconds.\n", myid, jsize, jtime);
+		// Wait for job to finish (if not shutdown)
+		if (shmems[0] == 0)
+		{
+			p(0, psem_id);
+			if (shmems[0] == 0)
+				printf("%d finished my request of %d blocks for %d seconds.\n", myid, jsize, jtime);
+		}
 
 		// Cleanup shared resources
 		if (shmdt(shmems) == -1) printf("shmgm: ERROR in detaching.\n");

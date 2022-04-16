@@ -163,6 +163,8 @@ int main(int argc, char *argv[])
 						
 						//Place requested job in the queue.
 						p(QUEUE, sem_id);
+						if (shmems[0] == 1)
+							break;
 
 						// Allocate memory for process node
 						struct node *myprocess = (struct node*) malloc(sizeof(struct node));
@@ -185,24 +187,6 @@ int main(int argc, char *argv[])
 				
 						v(QUEUE, sem_id);
 					}
-
-					/* Shared resources cleanup */
-					// Give time for other processes to stop using shared resources
-					sleep(1);
-
-					if (shmdt(shmemb) == -1) printf("shmgm: ERROR in detaching.\n");
-					if (shmdt(shmems) == -1) printf("shmgm: ERROR in detaching.\n");
-					if (shmdt(shmemq) == -1) printf("shmgm: ERROR in detaching.\n");
-
-					if ((shmctl(shmidb, IPC_RMID, NULL)) == -1) printf("ERROR in removing shmem.\n");
-					if ((shmctl(shmids, IPC_RMID, NULL)) == -1) printf("ERROR in removing shmem.\n");
-					if ((shmctl(shmidq, IPC_RMID, NULL)) == -1) printf("ERROR in removing shmem.\n");
-					if ((semctl(sem_id, 0, IPC_RMID, 0)) == -1) printf("ERROR in removing sem.\n");
-
-					int ret;
-					if ((ret = remove(MYIDS)) == -1) printf("ERROR: unable to delete mmids.\n");
-
-					printf("Consumer stopped.");
 				}
 				// Child process handles putting processes in RAM and printing jobs/RAM
 				else
@@ -222,6 +206,8 @@ int main(int argc, char *argv[])
 					{
 						// Gain access to queue
 						p(QUEUE, sem_id);
+						if (shmems[0] == 1)
+							break;
 
 						// Print header
 						printf("ID thePID Size Sec\n");
@@ -278,8 +264,8 @@ int main(int argc, char *argv[])
 						v(QUEUE, sem_id);
 
 						// Print RAM
-						printf("Bob’s   Memory   Manager");
-						printf("------------------------");
+						printf("Bob’s   Memory   Manager\n");
+						printf("------------------------\n");
 
 						// Header
 						printf("*");
@@ -307,6 +293,43 @@ int main(int argc, char *argv[])
 						// Sleep for 1 second
 						sleep(1);
 					}
+
+					
+					/* Shared resources cleanup */
+					// Gain access to queue
+					p(QUEUE, sem_id);
+
+					int qsize = shmemq->size;
+
+					// Iterate over queue to wake up producers
+					for (i = 0; i < qsize; i++)
+					{
+						// Get job
+						struct node *myjob = dequeue(shmemq);
+
+						// Wake up producer
+						v(0, myjob->p->psemid);
+					}
+
+					v(QUEUE, sem_id);
+
+
+					// Give time for other processes to stop using shared resources
+					sleep(1);
+
+					if (shmdt(shmemb) == -1) printf("shmgm: ERROR in detaching.\n");
+					if (shmdt(shmems) == -1) printf("shmgm: ERROR in detaching.\n");
+					if (shmdt(shmemq) == -1) printf("shmgm: ERROR in detaching.\n");
+
+					if ((shmctl(shmidb, IPC_RMID, NULL)) == -1) printf("ERROR in removing shmem.\n");
+					if ((shmctl(shmids, IPC_RMID, NULL)) == -1) printf("ERROR in removing shmem.\n");
+					if ((shmctl(shmidq, IPC_RMID, NULL)) == -1) printf("ERROR in removing shmem.\n");
+					if ((semctl(sem_id, 0, IPC_RMID, 0)) == -1) printf("ERROR in removing sem.\n");
+
+					int ret;
+					if ((ret = remove(MYIDS)) == -1) printf("ERROR: unable to delete mmids.\n");
+
+					printf("Consumer stopped.");
 				}
 			}
 			else
