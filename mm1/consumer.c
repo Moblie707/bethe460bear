@@ -201,28 +201,6 @@ int main(int argc, char *argv[])
 				// Child process handles putting processes in RAM and printing jobs/RAM
 				else
 				{
-					// Grab process from buffer, if possible
-					if (shmems[FULL2] == 1)
-					{
-						struct process myrequest;
-						myrequest.pid = shmemp->pid;
-						myrequest.psemid = shmemp->psemid;
-						myrequest.rid = shmemp->rid;
-						myrequest.size = shmemp->size;
-						myrequest.time = shmemp->time;
-						myrequest.inRAM = shmemp->inRAM;
-						myrequest.RAMPos = shmemp->RAMPos;
-						myrequest.pos = shmemp->pos;
-					
-						// Add to queue
-						struct node *newjob = (struct node*) malloc(sizeof(struct node));
-						newjob->p = myrequest;
-						enqueue(myqueue, newjob);
-	
-						shmems[FULL] = 0;
-						v(EMPTY2, sem_id);
-					}
-
 					// Create RAM
 					int sizeRAM = rows*cols;
 					char RAM[sizeRAM];
@@ -236,6 +214,28 @@ int main(int argc, char *argv[])
 					// Run while we don't need to shutdown
 					while (shmems[STOP] == 0)
 					{
+						// Grab process from buffer, if possible
+						if (shmems[FULL2] == 1)
+						{
+							struct process myrequest;
+							myrequest.pid = shmemp->pid;
+							myrequest.psemid = shmemp->psemid;
+							myrequest.rid = shmemp->rid;
+							myrequest.size = shmemp->size;
+							myrequest.time = shmemp->time;
+							myrequest.inRAM = shmemp->inRAM;
+							myrequest.RAMPos = shmemp->RAMPos;
+							myrequest.pos = shmemp->pos;
+						
+							// Add to queue
+							struct node *newjob = (struct node*) malloc(sizeof(struct node));
+							newjob->p = myrequest;
+							enqueue(myqueue, newjob);
+		
+							shmems[FULL] = 0;
+							v(EMPTY2, sem_id);
+						}
+
 						// Print header
 						printf("ID thePID Size Sec\n");
 

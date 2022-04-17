@@ -83,7 +83,7 @@ int main(int argc, char *argv[])
 		int myid = getpid();
 		struct process myjob;
 		myjob.pid = myid;
-		myjob.psemid = sem_id;
+		myjob.psemid = psem_id;
 		myjob.rid = '.';
 		myjob.size = jsize;
 		myjob.time = jtime;
