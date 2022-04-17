@@ -47,7 +47,7 @@ int main(int argc, char *argv[])
 		// Check that user input size of job and time needed
 		if (argc != 3)
 		{
-			printf("Must input size of job (1-%d), and time of job (1-30).", RAMSize);
+			printf("Must input size of job (1-%d), and time of job (1-30).\n", RAMSize);
 			return 0;
 		}
 
@@ -58,7 +58,7 @@ int main(int argc, char *argv[])
 		// Check that parameters fall within specified range
 		if ((jsize < 1 || jsize > RAMSize) || (jtime < 1 || jtime > 30))
 		{
-			printf("Must input size of job (1-%d), and time of job (1-30).", RAMSize);
+			printf("Must input size of job (1-%d), and time of job (1-30).\n", RAMSize);
 			return 0;	
 		}
 
@@ -84,9 +84,12 @@ int main(int argc, char *argv[])
 		struct process myjob;
 		myjob.pid = myid;
 		myjob.psemid = sem_id;
+		myjob.rid = '.';
 		myjob.size = jsize;
 		myjob.time = jtime;
 		myjob.inRAM = 0;
+		myjob.RAMPos = -1;
+		myjob.pos = -1;
 
 		printf("%d is requesting %d blocks for %d seconds.\n", myid, jsize, jtime);
 

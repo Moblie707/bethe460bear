@@ -29,6 +29,7 @@
 
 void putInRAM(/* in */ int size, /* inout */ char *RAM, /* inout */ struct process *myjob);
 void removeFromRAM(/* in */ int size, /* inout */ char *RAM, /* inout */ struct process *myjob);
+void copyProcess(/* inout */ struct process *target, /* in */ struct process source);
 
 int main(int argc, char *argv[])
 {	
@@ -61,6 +62,7 @@ int main(int argc, char *argv[])
 				semctl(sem_id, MUTEX, SETVAL, 1);
 				semctl(sem_id, FULL, SETVAL, 0);
 				semctl(sem_id, EMPTY, SETVAL, buffSize);
+				semctl(sem_id, QUEUE, SETVAL, 1);
 
 				// Get buffer shared memory
 				int shmidb = shmget(IPC_PRIVATE, (buffSize+2)*sizeof(struct process), 0770);
@@ -94,6 +96,9 @@ int main(int argc, char *argv[])
 		
 				shmemq = (struct queue *) shmat(shmidq, NULL, SHM_RND);
 
+				// Set queue size to 0
+				shmemq->size = 0;
+
 				// Get stop shared memory
 				int shmids = shmget(IPC_PRIVATE, sizeof(int), 0770);
 
@@ -125,7 +130,7 @@ int main(int argc, char *argv[])
 				fprintf(fp, "%d\n", buffSize);	// Size of buffer
 				fprintf(fp, "%d\n", sem_id);	// Semaphores id
 				fprintf(fp, "%d\n", shmidb);	// Buffer id
-				
+				fprintf(fp, "%d\n", rows*cols); // Size of RAM
 				fclose(fp);
 
 				/* Actual Memory Management code */
@@ -149,11 +154,11 @@ int main(int argc, char *argv[])
 						// Check if stopped after potential unblock
 						if (shmems[0] == 1)
 							break;
-
+						
 						// Get buffer request
 						struct process request;
 						request = shmemb[shmemb[buffSize].pos];
-
+						
 						// Move front of buffer
 						shmemb[buffSize].pos = (shmemb[buffSize].pos + 1) % buffSize;
 
@@ -168,10 +173,29 @@ int main(int argc, char *argv[])
 
 						// Allocate memory for process node
 						struct node *myprocess = (struct node*) malloc(sizeof(struct node));
+						printf("About to copy\n");
+						printf("pid\n");
+						myprocess->p->pid = 1;
+						printf("psemid\n");
+						myprocess->p->psemid = request.psemid;
+						printf("rid\n");
+						myprocess->p->rid = request.rid;
+						printf("size\n");
+						myprocess->p->size = request.size;
+						printf("time\n");
+						myprocess->p->time = request.time;
+						printf("inRAM\n");
+						myprocess->p->inRAM = request.inRAM;
+						printf("RAMPos\n");
+						myprocess->p->RAMPos = request.RAMPos;
+						printf("pos\n");
+						myprocess->p->pos = request.pos;
+						//copyProcess(myprocess->p, request);
+						printf("Not here.\n");
 
 						// Assign RAM ID
 						myprocess->p->rid = crid;
-		
+						
 						// Increment RAM ID
 						if (crid != 'Z')
 						{
@@ -184,7 +208,7 @@ int main(int argc, char *argv[])
 
 						// Put into queue
 						enqueue(shmemq, myprocess);
-				
+	
 						v(QUEUE, sem_id);
 					}
 				}
@@ -214,12 +238,16 @@ int main(int argc, char *argv[])
 
 						// Loop through queue to update each job
 						int qsize = shmemq->size;
-
+						
 						for (i = 0; i < qsize; i++)
 						{
 							// Get job
 							struct node *myjob = dequeue(shmemq);
-
+							
+							if (myjob->p == NULL)
+								printf("Aw man\n");
+							else
+								printf("Hmm\n");
 							// Perform different action depending on if
 							// it is in RAM
 							if (myjob->p->inRAM)
@@ -248,18 +276,22 @@ int main(int argc, char *argv[])
 							}
 							else
 							{
+								printf("Not in RAM.\n");
 								// Try to put job in RAM
 								putInRAM(sizeRAM, RAM, myjob->p);
-								
+								printf("In RAM now\n");
 								// Print job
 								struct process *jp = myjob->p;
 								printf("%c. %-6d %-4d %-3d", jp->rid, jp->pid, jp->size, jp->time);
 
 								// Requeue
 								enqueue(shmemq, myjob);
+								printf("After requeue, size is %d\n", shmemq->size);
 							}
 
 						}
+
+						printf("\n");
 
 						v(QUEUE, sem_id);
 
@@ -279,7 +311,7 @@ int main(int argc, char *argv[])
 							printf("*");
 							for (j = 0; j < cols; j++)
 							{
-								printf("%c",RAM[(i*rows) + j]);
+								printf("%c",RAM[(i*cols) + j]);
 							}
 							printf("*\n");
 						}
@@ -288,7 +320,7 @@ int main(int argc, char *argv[])
 						printf("*");
 						for (i = 0; i < cols; i++)
 							printf("*");
-						printf("*\n");
+						printf("*\n\n");
 
 						// Sleep for 1 second
 						sleep(1);
@@ -415,7 +447,21 @@ void removeFromRAM(/* in */ int size, /* inout */ char *RAM, /* inout */ struct 
 	myjob->inRAM = 0;
 }
 
+void copyProcess(/* inout */ struct process *target, /* in */ struct process source)
+{
+	/* Pre: A pointer to an empty process is passed, as well a process to give it.
+ 	 * Post: The information from the source process is deep copied to the target.
+ 	 */
 
+	target->pid = source.pid;
+	target->psemid = source.psemid;
+	target->rid = source.rid;
+	target->size = source.size;
+	target->time = source.time;
+	target->inRAM = source.inRAM;
+	target->RAMPos = source.RAMPos;
+	target->pos = source.pos;
+}
 
 
 
