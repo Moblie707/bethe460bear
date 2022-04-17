@@ -44,13 +44,13 @@ int main(int argc, char *argv[])
 		shmems = (int *) shmat(shmids, NULL, SHM_RND);
 
 		// Set stop to true
-		shmems[0] = 1;
+		shmems[STOP] = 1;
 
 		// V on EMPTY, FULL, MUTEX, and QUEUE
 		v(EMPTY, sem_id);
 		v(FULL, sem_id);
 		v(MUTEX, sem_id);
-		v(QUEUE, sem_id);
+		v(EMPTY2, sem_id);
 
 		// Detach from shared memory
 		if (shmdt(shmems) == -1) printf("shmgm: ERROR in detaching.\n");

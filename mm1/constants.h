@@ -5,4 +5,6 @@
 #define MUTEX 0
 #define FULL 1
 #define EMPTY 2
-#define QUEUE 3
+#define EMPTY2 3
+#define STOP 0
+#define FULL2 1

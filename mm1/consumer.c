@@ -61,7 +61,7 @@ int main(int argc, char *argv[])
 				semctl(sem_id, MUTEX, SETVAL, 1);
 				semctl(sem_id, FULL, SETVAL, 0);
 				semctl(sem_id, EMPTY, SETVAL, buffSize);
-				semctl(sem_id, QUEUE, SETVAL, 1);
+				semctl(sem_id, EMPTY2, SETVAL, 1);
 
 				// Get buffer shared memory
 				int shmidb = shmget(IPC_PRIVATE, (buffSize+2)*sizeof(struct process), 0770);
@@ -81,25 +81,22 @@ int main(int argc, char *argv[])
 				shmemb[buffSize].pos = 0;
 				shmemb[buffSize+1].pos = 0;
 			
-				// Get queue shared memory
-				int shmidq = shmget(IPC_PRIVATE, sizeof(struct queue), 0770);
+				// Get process shared memory
+				int shmidp = shmget(IPC_PRIVATE, sizeof(struct process), 0770);
 
-				if (shmidq == -1)
+				if (shmidp == -1)
 				{
 					printf("Could not get shared memory.\n");
 					return -1;
 				}
 
 				// Attach to shared memory
-				struct queue *shmemq;
+				struct process *shmemp;
 		
-				shmemq = (struct queue *) shmat(shmidq, NULL, SHM_RND);
+				shmemp = (struct process *) shmat(shmidp, NULL, SHM_RND);
 
-				// Set queue size to 0
-				shmemq->size = 0;
-
-				// Get stop shared memory
-				int shmids = shmget(IPC_PRIVATE, sizeof(int), 0770);
+				// Get stop and full2 shared memory
+				int shmids = shmget(IPC_PRIVATE, 2*sizeof(int), 0770);
 
 				if (shmids == -1)
 				{
@@ -113,10 +110,11 @@ int main(int argc, char *argv[])
 				shmems = (int *) shmat(shmids, NULL, SHM_RND);
 
 				// Initialize the shared memory
-				shmems[0] = 0;
+				shmems[STOP] = 0;
+				shmems[FULL2] = 0;
 
 				// Write all shared resource ids to external file
-				// Exception: queue only used within consumer, so no need
+				// Exception: process only used within consumer, so no need
 				FILE *fopen(), *fp;
 
 				if ((fp = fopen(MYIDS, "w")) == NULL)
@@ -134,8 +132,9 @@ int main(int argc, char *argv[])
 
 				/* Actual Memory Management code */
 
-				// Allocate memory for process node
-				struct node *myprocess = (struct node*) malloc(sizeof(struct node));
+				// Create process queue
+				struct queue *myqueue = (struct queue*) malloc(sizeof(struct queue));
+				myqueue->size = 0;
 
 				// Parent process will handle receiving requests from the buffer
 				// and adding them to the shared consumer queue.
@@ -145,7 +144,7 @@ int main(int argc, char *argv[])
 					char crid = 'A';
 
 					// Run while we don't need to stop
-					while (shmems[0] == 0)
+					while (shmems[STOP] == 0)
 					{
 						// Try to access buffer
 						p(FULL, sem_id);
@@ -167,24 +166,23 @@ int main(int argc, char *argv[])
 						v(MUTEX, sem_id);
 						v(EMPTY, sem_id);
 
-						
-						//Place requested job in the queue.
-						p(QUEUE, sem_id);
-						if (shmems[0] == 1)
+						//Place requested job in process buffer.
+						p(EMPTY2, sem_id);
+						if (shmems[STOP] == 1)
 							break;
 	
-						// Copy request to node process
-						(myprocess->p).pid = request.pid;
-						(myprocess->p).psemid = request.psemid;
-						(myprocess->p).rid = request.rid;
-						(myprocess->p).size = request.size;
-						(myprocess->p).time = request.time;
-						(myprocess->p).inRAM = request.inRAM;
-						(myprocess->p).RAMPos = request.RAMPos;
-						(myprocess->p).pos = request.pos;
+						// Copy request to process buffer
+						shmemp->pid = request.pid;
+						shmemp->psemid = request.psemid;
+						shmemp->rid = request.rid;
+						shmemp->size = request.size;
+						shmemp->time = request.time;
+						shmemp->inRAM = request.inRAM;
+						shmemp->RAMPos = request.RAMPos;
+						shmemp->pos = request.pos;
 						
 						// Assign RAM ID
-						(myprocess->p).rid = crid;
+						shmemp->rid = crid;
 						
 						// Increment RAM ID
 						if (crid != 'Z')
@@ -195,19 +193,36 @@ int main(int argc, char *argv[])
 						{
 							crid = 'A';
 						}
-
-						// Put into queue
-						enqueue(shmemq, myprocess);
-						/*myprocess = dequeue(shmemq);
-						printf("%c. %-6d %-4d %-3d\n", (myprocess->p).rid, (myprocess->p).pid, (myprocess->p).size, (myprocess->p).time);
-						enqueue(shmemq, myprocess);*/
 	
-						v(QUEUE, sem_id);
+						// Indicate process buffer is full
+						shmems[FULL2] = 1;
 					}
 				}
 				// Child process handles putting processes in RAM and printing jobs/RAM
 				else
 				{
+					// Grab process from buffer, if possible
+					if (shmems[FULL2] == 1)
+					{
+						struct process myrequest;
+						myrequest.pid = shmemp->pid;
+						myrequest.psemid = shmemp->psemid;
+						myrequest.rid = shmemp->rid;
+						myrequest.size = shmemp->size;
+						myrequest.time = shmemp->time;
+						myrequest.inRAM = shmemp->inRAM;
+						myrequest.RAMPos = shmemp->RAMPos;
+						myrequest.pos = shmemp->pos;
+					
+						// Add to queue
+						struct node *newjob = (struct node*) malloc(sizeof(struct node));
+						newjob->p = myrequest;
+						enqueue(myqueue, newjob);
+	
+						shmems[FULL] = 0;
+						v(EMPTY2, sem_id);
+					}
+
 					// Create RAM
 					int sizeRAM = rows*cols;
 					char RAM[sizeRAM];
@@ -216,28 +231,22 @@ int main(int argc, char *argv[])
 					for (i = 0; i < sizeRAM; i++)
 					{
 						RAM[i] = '.';
-					} 
+					}
 
 					// Run while we don't need to shutdown
-					while (shmems[0] == 0)
+					while (shmems[STOP] == 0)
 					{
-						// Gain access to queue
-						p(QUEUE, sem_id);
-						if (shmems[0] == 1)
-							break;
-
 						// Print header
 						printf("ID thePID Size Sec\n");
 
 						// Loop through queue to update each job
-						int qsize = shmemq->size;
+						int qsize = myqueue->size;
 						
 						for (i = 0; i < qsize; i++)
 						{
 							// Get job
-							struct node *myjob = dequeue(shmemq);
+							struct node *myjob = dequeue(myqueue);
 							struct process jp = myjob->p;
-							printf("%c. %-6d %-4d %-3d\n", jp.rid, jp.pid, jp.size, jp.time);
 							
 							// Perform different action depending on if
 							// it is in RAM
@@ -262,29 +271,25 @@ int main(int argc, char *argv[])
 									printf("%c. %-6d %-4d %-3d\n", jp.rid, jp.pid, jp.size, jp.time);
 
 									// Requeue
-									enqueue(shmemq, myjob);
+									enqueue(myqueue, myjob);
 								}
 							}
 							else
 							{
-								printf("Not in RAM.\n");
 								// Try to put job in RAM
 								putInRAM(sizeRAM, RAM, &(myjob->p));
-								printf("In RAM now\n");
+								
 								// Print job
 								struct process jp = myjob->p;
 								printf("%c. %-6d %-4d %-3d\n", jp.rid, jp.pid, jp.size, jp.time);
 
 								// Requeue
-								enqueue(shmemq, myjob);
-								printf("After requeue, size is %d\n", shmemq->size);
+								enqueue(myqueue, myjob);
 							}
 
 						}
 
 						printf("\n");
-
-						v(QUEUE, sem_id);
 
 						// Print RAM
 						printf("Bob’s   Memory   Manager\n");
@@ -319,34 +324,28 @@ int main(int argc, char *argv[])
 
 					
 					/* Shared resources cleanup */
-					// Gain access to queue
-					p(QUEUE, sem_id);
-
-					int qsize = shmemq->size;
+					int qsize = myqueue->size;
 
 					// Iterate over queue to wake up producers
 					for (i = 0; i < qsize; i++)
 					{
 						// Get job
-						struct node *myjob = dequeue(shmemq);
+						struct node *myjob = dequeue(myqueue);
 
 						// Wake up producer
 						v(0, (myjob->p).psemid);
 					}
-
-					v(QUEUE, sem_id);
-
 
 					// Give time for other processes to stop using shared resources
 					sleep(1);
 
 					if (shmdt(shmemb) == -1) printf("shmgm: ERROR in detaching.\n");
 					if (shmdt(shmems) == -1) printf("shmgm: ERROR in detaching.\n");
-					if (shmdt(shmemq) == -1) printf("shmgm: ERROR in detaching.\n");
+					if (shmdt(shmemp) == -1) printf("shmgm: ERROR in detaching.\n");
 
 					if ((shmctl(shmidb, IPC_RMID, NULL)) == -1) printf("ERROR in removing shmem.\n");
 					if ((shmctl(shmids, IPC_RMID, NULL)) == -1) printf("ERROR in removing shmem.\n");
-					if ((shmctl(shmidq, IPC_RMID, NULL)) == -1) printf("ERROR in removing shmem.\n");
+					if ((shmctl(shmidp, IPC_RMID, NULL)) == -1) printf("ERROR in removing shmem.\n");
 					if ((semctl(sem_id, 0, IPC_RMID, 0)) == -1) printf("ERROR in removing sem.\n");
 
 					int ret;

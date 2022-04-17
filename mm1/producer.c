@@ -96,10 +96,10 @@ int main(int argc, char *argv[])
 		// Put job in buffer
 		// Only proceed if not shutdown
 		p(EMPTY, sem_id);
-		if (shmems[0] == 0)
+		if (shmems[STOP] == 0)
 		{
 			p(MUTEX, sem_id);
-			if (shmems[0] == 0)
+			if (shmems[STOP] == 0)
 			{
 				shmemb[shmemb[SIZE+1].pos] = myjob;
 				shmemb[SIZE+1].pos = (shmemb[SIZE+1].pos + 1) % SIZE;
@@ -113,10 +113,10 @@ int main(int argc, char *argv[])
 		}
 
 		// Wait for job to finish (if not shutdown)
-		if (shmems[0] == 0)
+		if (shmems[STOP] == 0)
 		{
 			p(0, psem_id);
-			if (shmems[0] == 0)
+			if (shmems[STOP] == 0)
 				printf("%d finished my request of %d blocks for %d seconds.\n", myid, jsize, jtime);
 		}
 
