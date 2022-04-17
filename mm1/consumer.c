@@ -29,7 +29,6 @@
 
 void putInRAM(/* in */ int size, /* inout */ char *RAM, /* inout */ struct process *myjob);
 void removeFromRAM(/* in */ int size, /* inout */ char *RAM, /* inout */ struct process *myjob);
-void copyProcess(/* inout */ struct process *target, /* in */ struct process source);
 
 int main(int argc, char *argv[])
 {	
@@ -122,7 +121,7 @@ int main(int argc, char *argv[])
 
 				if ((fp = fopen(MYIDS, "w")) == NULL)
 				{
-					printf(":( could not open beastieids to write.\n");
+					printf(":( could not open mmids to write.\n");
 					return -1;
 				}
 
@@ -134,6 +133,9 @@ int main(int argc, char *argv[])
 				fclose(fp);
 
 				/* Actual Memory Management code */
+
+				// Allocate memory for process node
+				struct node *myprocess = (struct node*) malloc(sizeof(struct node));
 
 				// Parent process will handle receiving requests from the buffer
 				// and adding them to the shared consumer queue.
@@ -170,31 +172,19 @@ int main(int argc, char *argv[])
 						p(QUEUE, sem_id);
 						if (shmems[0] == 1)
 							break;
-
-						// Allocate memory for process node
-						struct node *myprocess = (struct node*) malloc(sizeof(struct node));
-						printf("About to copy\n");
-						printf("pid\n");
-						myprocess->p->pid = 1;
-						printf("psemid\n");
-						myprocess->p->psemid = request.psemid;
-						printf("rid\n");
-						myprocess->p->rid = request.rid;
-						printf("size\n");
-						myprocess->p->size = request.size;
-						printf("time\n");
-						myprocess->p->time = request.time;
-						printf("inRAM\n");
-						myprocess->p->inRAM = request.inRAM;
-						printf("RAMPos\n");
-						myprocess->p->RAMPos = request.RAMPos;
-						printf("pos\n");
-						myprocess->p->pos = request.pos;
-						//copyProcess(myprocess->p, request);
-						printf("Not here.\n");
-
+	
+						// Copy request to node process
+						(myprocess->p).pid = request.pid;
+						(myprocess->p).psemid = request.psemid;
+						(myprocess->p).rid = request.rid;
+						(myprocess->p).size = request.size;
+						(myprocess->p).time = request.time;
+						(myprocess->p).inRAM = request.inRAM;
+						(myprocess->p).RAMPos = request.RAMPos;
+						(myprocess->p).pos = request.pos;
+						
 						// Assign RAM ID
-						myprocess->p->rid = crid;
+						(myprocess->p).rid = crid;
 						
 						// Increment RAM ID
 						if (crid != 'Z')
@@ -208,6 +198,9 @@ int main(int argc, char *argv[])
 
 						// Put into queue
 						enqueue(shmemq, myprocess);
+						/*myprocess = dequeue(shmemq);
+						printf("%c. %-6d %-4d %-3d\n", (myprocess->p).rid, (myprocess->p).pid, (myprocess->p).size, (myprocess->p).time);
+						enqueue(shmemq, myprocess);*/
 	
 						v(QUEUE, sem_id);
 					}
@@ -243,32 +236,30 @@ int main(int argc, char *argv[])
 						{
 							// Get job
 							struct node *myjob = dequeue(shmemq);
+							struct process jp = myjob->p;
+							printf("%c. %-6d %-4d %-3d\n", jp.rid, jp.pid, jp.size, jp.time);
 							
-							if (myjob->p == NULL)
-								printf("Aw man\n");
-							else
-								printf("Hmm\n");
 							// Perform different action depending on if
 							// it is in RAM
-							if (myjob->p->inRAM)
+							if ((myjob->p).inRAM)
 							{
 								// Decrement time remaining
-								myjob->p->time = myjob->p->time - 1;
+								(myjob->p).time = (myjob->p).time - 1;
 
 								// See if job is done
-								if (myjob->p->time == 0)
+								if ((myjob->p).time == 0)
 								{
 									// Remove from RAM
-									removeFromRAM(sizeRAM, RAM, myjob->p);
+									removeFromRAM(sizeRAM, RAM, &(myjob->p));
 
 									// Wake up producer
-									v(0, myjob->p->psemid);
+									v(0, (myjob->p).psemid);
 								}
 								else
 								{
 									// Print job
-									struct process *jp = myjob->p;
-									printf("%c. %-6d %-4d %-3d", jp->rid, jp->pid, jp->size, jp->time);
+									struct process jp = myjob->p;
+									printf("%c. %-6d %-4d %-3d\n", jp.rid, jp.pid, jp.size, jp.time);
 
 									// Requeue
 									enqueue(shmemq, myjob);
@@ -278,11 +269,11 @@ int main(int argc, char *argv[])
 							{
 								printf("Not in RAM.\n");
 								// Try to put job in RAM
-								putInRAM(sizeRAM, RAM, myjob->p);
+								putInRAM(sizeRAM, RAM, &(myjob->p));
 								printf("In RAM now\n");
 								// Print job
-								struct process *jp = myjob->p;
-								printf("%c. %-6d %-4d %-3d", jp->rid, jp->pid, jp->size, jp->time);
+								struct process jp = myjob->p;
+								printf("%c. %-6d %-4d %-3d\n", jp.rid, jp.pid, jp.size, jp.time);
 
 								// Requeue
 								enqueue(shmemq, myjob);
@@ -340,7 +331,7 @@ int main(int argc, char *argv[])
 						struct node *myjob = dequeue(shmemq);
 
 						// Wake up producer
-						v(0, myjob->p->psemid);
+						v(0, (myjob->p).psemid);
 					}
 
 					v(QUEUE, sem_id);
@@ -447,21 +438,6 @@ void removeFromRAM(/* in */ int size, /* inout */ char *RAM, /* inout */ struct 
 	myjob->inRAM = 0;
 }
 
-void copyProcess(/* inout */ struct process *target, /* in */ struct process source)
-{
-	/* Pre: A pointer to an empty process is passed, as well a process to give it.
- 	 * Post: The information from the source process is deep copied to the target.
- 	 */
-
-	target->pid = source.pid;
-	target->psemid = source.psemid;
-	target->rid = source.rid;
-	target->size = source.size;
-	target->time = source.time;
-	target->inRAM = source.inRAM;
-	target->RAMPos = source.RAMPos;
-	target->pos = source.pos;
-}
 
 
 
