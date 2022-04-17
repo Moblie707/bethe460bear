@@ -1,0 +1,5 @@
+To test this project, simply run the 'make' command. This creates the
+consumer, producer, and shutdown executables. I've also included a 
+simple bash script called RAMTest that you can edit to try things out.
+Just make sure you shutdown after a consumer call! Don't want any
+memory left out there.

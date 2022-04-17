@@ -89,7 +89,6 @@ int main(int argc, char *argv[])
 		myjob.time = jtime;
 		myjob.inRAM = 0;
 		myjob.RAMPos = -1;
-		myjob.pos = -1;
 
 		printf("%d is requesting %d blocks for %d seconds.\n", myid, jsize, jtime);
 
