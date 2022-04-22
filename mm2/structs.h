@@ -14,7 +14,6 @@ struct process
 	int time;
 	State mystate;
 	int RAMPos;
-	int inCPU;
 	int ctime;
 	int pos;
 };

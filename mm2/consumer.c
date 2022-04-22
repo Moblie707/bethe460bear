@@ -185,7 +185,6 @@ int main(int argc, char *argv[])
 						shmemp->time = request.time;
 						shmemp->mystate = request.mystate;
 						shmemp->RAMPos = request.RAMPos;
-						shmemp->inCPU = request.inCPU;
 						shmemp->ctime = request.ctime;
 						shmemp->pos = request.pos;
 						
@@ -223,6 +222,9 @@ int main(int argc, char *argv[])
 						RAM[i] = '.';
 					}
 
+					// Create CPU
+					int CPU = 0;
+
 					// Run while we don't need to shutdown
 					while (shmems[STOP] == 0)
 					{
@@ -237,7 +239,6 @@ int main(int argc, char *argv[])
 							myrequest.time = shmemp->time;
 							myrequest.mystate = shmemp->mystate;
 							myrequest.RAMPos = shmemp->RAMPos;
-							myrequest.inCPU = shmemp->inCPU;
 							myrequest.ctime = shmemp->ctime;
 							myrequest.pos = shmemp->pos;
 						
@@ -251,7 +252,7 @@ int main(int argc, char *argv[])
 						}
 
 						// Print header
-						printf("ID thePID State Loc Size Sec\n");
+						printf("ID thePID State     Loc Size Sec\n");
 
 						// Loop through queue to update each job
 						int qsize = myqueue->size;
@@ -272,8 +273,8 @@ int main(int argc, char *argv[])
 								(myjob->p).mystate = newp;
 
 								// String state
-								char sstate[9] = "new";
-								char loc[3] = "";
+								char sstate[9] = "new      ";
+								char loc[3] = "   ";
 
 								// Print job
 								struct process jp = myjob->p;
@@ -292,7 +293,7 @@ int main(int argc, char *argv[])
 								if ((myjob->p).mystate == ready)
 								{
 									// String state
-									char sstate[9] = "ready";
+									char sstate[9] = "ready    ";
 
 									// Print job
 									struct process jp = myjob->p;
@@ -306,7 +307,7 @@ int main(int argc, char *argv[])
 								{
 									// String state
 									char sstate[9] = "suspended";
-									char loc[3] = "";
+									char loc[3] = "   ";
 
 									// Print job
 									struct process jp = myjob->p;
@@ -319,51 +320,125 @@ int main(int argc, char *argv[])
 							// Ready state
 							else if ((myjob->p).mystate == ready)
 							{
-							///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////	
-
-							}
-							
-
-
-
-
-							if ((myjob->p).inRAM)
-							{
-								// Decrement time remaining
-								(myjob->p).time = (myjob->p).time - 1;
-
-								// See if job is done
-								if ((myjob->p).time == 0)
+								// If no one is in CPU, enter it
+								if (CPU == 0)
 								{
-									// Remove from RAM
-									removeFromRAM(sizeRAM, RAM, &(myjob->p));
+									// CPU occupied
+									CPU = 1;
 
-									// Wake up producer
-									v(0, (myjob->p).psemid);
+									// Set state
+									(myjob->p).mystate = run;
+									(myjob->p).ctime = 0;							
+	
+									// String state
+									char sstate[9] = "run      ";
+	
+									// Print job
+									struct process jp = myjob->p;
+									printf("%c. %-6d %-s %-3d %-4d %-3d\n", jp.rid, jp.pid, sstate, jp.RAMPos, jp.size, jp.time);
+
+									// Requeue
+									enqueue(myqueue, myjob);
 								}
 								else
 								{
+									// String state
+									char sstate[9] = "ready    ";
+
 									// Print job
 									struct process jp = myjob->p;
-									printf("%c. %-6d %-4d %-3d\n", jp.rid, jp.pid, jp.size, jp.time);
+									printf("%c. %-6d %-s %-3d %-4d %-3d\n", jp.rid, jp.pid, sstate, jp.RAMPos, jp.size, jp.time);
 
 									// Requeue
 									enqueue(myqueue, myjob);
 								}
 							}
+							// Run state
+							else if ((myjob->p).mystate == run)
+							{
+								// Spend 1 second in CPU
+								(myjob->p).time = (myjob->p).time - 1;
+								(myjob->p).ctime = (myjob->p).ctime + 1;
+
+								// Check if job is done
+								if ((myjob->p).time == 0)
+								{
+									// CPU free
+									CPU = 0;
+									
+									// Set state
+									(myjob->p).mystate = terminate;
+
+									// String state
+									char sstate[9] = "terminate";
+	
+									// Print job
+									struct process jp = myjob->p;
+									printf("%c. %-6d %-s %-3d %-4d %-3d\n", jp.rid, jp.pid, sstate, jp.RAMPos, jp.size, jp.time);
+
+									// Requeue
+									enqueue(myqueue, myjob);
+								}
+								// Check if job has reached maximum time slice
+								else if ((myjob->p).ctime == timeSlice)
+								{
+									// CPU free
+									CPU = 0;
+
+									// Set state
+									(myjob->p).mystate = ready;
+									
+									// String state
+									char sstate[9] = "ready    ";
+
+									// Print job
+									struct process jp = myjob->p;
+									printf("%c. %-6d %-s %-3d %-4d %-3d\n", jp.rid, jp.pid, sstate, jp.RAMPos, jp.size, jp.time);
+
+									// Add to round robin queue
+									enqueue(rrqueue, myjob);
+								}
+								// Otherwise, remain in CPU
+								else
+								{
+									// String state
+									char sstate[9] = "run      ";
+	
+									// Print job
+									struct process jp = myjob->p;
+									printf("%c. %-6d %-s %-3d %-4d %-3d\n", jp.rid, jp.pid, sstate, jp.RAMPos, jp.size, jp.time);
+
+									// Requeue
+									enqueue(myqueue, myjob);
+								}
+							}
+							// Terminate state
+							else if ((myjob->p).mystate == terminate)
+							{
+								// Remove from RAM
+								removeFromRAM(sizeRAM, RAM, &(myjob->p));
+
+								// Wake up producer
+								v(0, (myjob->p).psemid);
+							}
+							// Horrible Error
 							else
 							{
-								// Try to put job in RAM
-								putInRAM(sizeRAM, RAM, &(myjob->p));
-								
-								// Print job
-								struct process jp = myjob->p;
-								printf("%c. %-6d %-4d %-3d\n", jp.rid, jp.pid, jp.size, jp.time);
-
-								// Requeue
-								enqueue(myqueue, myjob);
+								printf("Something went wrong; invalid state.\n");
+								system("shutdown");
 							}
+						}
 
+						// Add round robin jobs to end of queue
+						int rsize = rrqueue->size;
+
+						for (i = 0; i < rsize; i++)
+						{
+							// Get job
+							struct node *myjob = dequeue(rrqueue);
+						
+							// Enqueue to main PCB
+							enqueue(myqueue, myjob);
 						}
 
 						printf("\n");
@@ -489,7 +564,7 @@ void putInRAM(/* in */ int size, /* inout */ char *RAM, /* inout */ struct proce
 				}
 
 				// Set info now that it is in RAM
-				myjob->state = ready;
+				myjob->mystate = ready;
 				myjob->RAMPos = jobPos;
 			}
 		}
@@ -511,7 +586,7 @@ void removeFromRAM(/* in */ int size, /* inout */ char *RAM, /* inout */ struct 
 		RAM[i] = '.';
 	}
 
-	myjob->state = terminate;
+	myjob->mystate = terminate;
 }
 
 

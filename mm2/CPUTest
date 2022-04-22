@@ -2,7 +2,7 @@
 make pristine
 make
 sleep 1
-consumer 10 10 5&
+consumer 10 10 5 5&
 sleep 1
 producer 12 25&
 sleep 1
