@@ -1,0 +1,18 @@
+#!/bin/bash
+make pristine
+make
+sleep 1
+consumer 10 10 5&
+sleep 1
+producer 12 25&
+sleep 1
+producer 16 5&
+sleep 1
+producer 5 10&
+sleep 1
+producer 63 30&
+sleep 1
+producer 5 10&
+sleep 1
+producer 12 14&
+sleep 1
